@@ -1,5 +1,6 @@
 /spreadsheets/
 /gas-projects/
+/archive/
 __pycache__/
 *.pyc
 /dashboard.html
