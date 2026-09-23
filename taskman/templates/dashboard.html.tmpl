@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>taskman dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --surface-2: #f5f4f1;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #85837c;
+    --border: #e4e2dc;
+    --accent: #256abf;
+    --track: #cde2fb;
+    --warn-bg: #fdf2e4;
+    --warn-border: #eda100;
+    --slot-sketch: #2a78d6;
+    --slot-lineart: #eb6834;
+    --slot-object: #1baf7a;
+    --slot-illustrate: #eda100;
+    --slot-effect: #e87ba4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --surface-2: #232322;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8d83;
+      --border: #33322f;
+      --accent: #3987e5;
+      --track: #184f95;
+      --warn-bg: #2a2416;
+      --warn-border: #c98500;
+      --slot-sketch: #3987e5;
+      --slot-lineart: #d95926;
+      --slot-object: #199e70;
+      --slot-illustrate: #c98500;
+      --slot-effect: #d55181;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Hiragino Sans, "Noto Sans JP", sans-serif;
+  }
+  header {
+    padding: 20px 24px 0;
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+  .meta {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  .warnings {
+    margin: 0 24px 16px;
+    padding: 10px 14px;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .warnings summary { cursor: pointer; font-weight: 600; }
+  .warnings ul { margin: 8px 0 0; padding-left: 20px; }
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    appearance: none;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs button[aria-selected="true"] {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  main { padding: 20px 24px 60px; }
+  section.tabpanel[hidden] { display: none; }
+
+  .summary-row {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .stat-tile {
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 12px 18px;
+    min-width: 140px;
+  }
+  .stat-tile .label { font-size: 12px; color: var(--text-secondary); }
+  .stat-tile .value { font-size: 24px; font-weight: 600; margin-top: 2px; }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .toolbar button, .toolbar select {
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+  .ring-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-end;
+  }
+  .ring-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 200px;
+  }
+  .ring-canvas-wrap { display: flex; align-items: center; justify-content: center; height: 200px; }
+  .ring-card .plot-name {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    max-width: 190px;
+    overflow-wrap: break-word;
+  }
+  .ring-card .plot-figures {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  table.data-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  table.data-table th, table.data-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  table.data-table td.num, table.data-table th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table tbody tr:hover { background: var(--surface-2); }
+
+  .split {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .split .chart-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .split .table-col { flex: 1; min-width: 280px; }
+  .pie-canvas-wrap { width: 260px; height: 260px; }
+
+  .subtabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+  .subtabs button {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .subtabs button[aria-selected="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .legend-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .legend-row .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+
+  details.table-toggle { margin-top: 4px; }
+  details.table-toggle > summary { cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>taskman dashboard</h1>
+  <div class="meta" id="meta-line"></div>
+</header>
+
+<div id="warnings-banner"></div>
+
+<nav class="tabs" role="tablist">
+  <button id="tab-btn-overview" role="tab" aria-selected="true" aria-controls="tab-overview">全体進捗</button>
+  <button id="tab-btn-byplot" role="tab" aria-selected="false" aria-controls="tab-byplot">plotごと</button>
+  <button id="tab-btn-bygroup" role="tab" aria-selected="false" aria-controls="tab-bygroup">タスクごと</button>
+</nav>
+
+<main>
+  <section id="tab-overview" class="tabpanel" role="tabpanel" aria-labelledby="tab-btn-overview">
+    <div class="summary-row" id="overview-summary"></div>
+    <div class="toolbar">
+      <span style="font-size:12px;color:var(--text-secondary);">並び順:</span>
+      <button id="sort-order-btn" aria-pressed="true">出現順</button>
+      <button id="sort-remaining-btn" aria-pressed="false">残時間が多い順</button>
+    </div>
+    <div class="ring-grid" id="ring-grid"></div>
+    <details class="table-toggle">
+      <summary>表で見る</summary>
+      <div id="overview-table"></div>
+    </details>
+  </section>
+
+  <section id="tab-byplot" class="tabpanel" role="tabpanel" aria-labelledby="tab-btn-byplot" hidden>
+    <div class="toolbar">
+      <span style="font-size:12px;color:var(--text-secondary);">plot:</span>
+      <select id="byplot-select"></select>
+    </div>
+    <div class="split">
+      <div class="chart-col">
+        <div class="pie-canvas-wrap"><canvas id="byplot-canvas"></canvas></div>
+        <div class="legend-row" id="byplot-legend"></div>
+      </div>
+      <div class="table-col">
+        <div id="byplot-table"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-bygroup" class="tabpanel" role="tabpanel" aria-labelledby="tab-btn-bygroup" hidden>
+    <div class="subtabs" id="bygroup-subtabs"></div>
+    <div class="split">
+      <div class="chart-col">
+        <div class="pie-canvas-wrap"><canvas id="bygroup-canvas"></canvas></div>
+        <div class="legend-row" id="bygroup-legend"></div>
+      </div>
+      <div class="table-col">
+        <div id="bygroup-table"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const DATA = __DASHBOARD_DATA_JSON__;
+
+// ---- webui設計書.md §6.1: リング半径（面積比例sqrtスケール） ----
+const DOMAIN_MAX_H = 30;
+const MIN_RADIUS = 28;
+const MAX_RADIUS = 90;
+function ringRadius(remainingH) {
+  const v = Math.min(Math.max(remainingH, 0), DOMAIN_MAX_H);
+  const t = Math.sqrt(v / DOMAIN_MAX_H);
+  return MIN_RADIUS + (MAX_RADIUS - MIN_RADIUS) * t;
+}
+
+// ---- webui設計書.md §6.2: スライス角度の最小クリップ ----
+const MIN_SLICE_DEG = 10;
+function clippedSliceAngles(values) {
+  const total = values.reduce((a, b) => a + b, 0);
+  if (total <= 0) return values.map(() => 0);
+  const rawAngles = values.map(v => (v / total) * 360);
+  const bumped = rawAngles.map((a, i) => values[i] > 0 && a < MIN_SLICE_DEG);
+  const bumpedSum = rawAngles.reduce((s, a, i) => s + (bumped[i] ? MIN_SLICE_DEG : 0), 0);
+  const restRawSum = rawAngles.reduce((s, a, i) => s + (bumped[i] ? 0 : a), 0);
+  const restBudget = 360 - bumpedSum;
+  return rawAngles.map((a, i) => {
+    if (bumped[i]) return MIN_SLICE_DEG;
+    if (restRawSum <= 0) return a;
+    return (a / restRawSum) * restBudget;
+  });
+}
+
+const GROUP_COLORS = {
+  sketch: getCss("--slot-sketch"),
+  lineart: getCss("--slot-lineart"),
+  object: getCss("--slot-object"),
+  illustrate: getCss("--slot-illustrate"),
+  effect: getCss("--slot-effect"),
+};
+function getCss(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+// plot用の色（タブ3）はカテゴリカル8色ローテーション不可の方針に配慮し、
+// 現状のplot数（<=8）では系列色として同じ8スロットの色相を使う。
+const PLOT_COLOR_POOL = [
+  "#2a78d6", "#eb6834", "#1baf7a", "#eda100",
+  "#e87ba4", "#008300", "#4a3aa7", "#e34948",
+];
+function plotColor(index) {
+  return PLOT_COLOR_POOL[index % PLOT_COLOR_POOL.length];
+}
+
+function fmtH(h) { return h.toFixed(1) + "h"; }
+function fmtPct(p) { return p.toFixed(1) + "%"; }
+
+// ---------------------------------------------------------------- header/meta
+document.getElementById("meta-line").textContent =
+  DATA.input_file + " / 生成: " + DATA.generated_at;
+
+if (DATA.warnings && DATA.warnings.length > 0) {
+  const box = document.createElement("details");
+  box.className = "warnings";
+  box.open = false;
+  const summary = document.createElement("summary");
+  summary.textContent = "警告 " + DATA.warnings.length + "件（マスタに未定義のmodeを含む行をスキップしました）";
+  box.appendChild(summary);
+  const ul = document.createElement("ul");
+  DATA.warnings.forEach(w => {
+    const li = document.createElement("li");
+    li.textContent = w;
+    ul.appendChild(li);
+  });
+  box.appendChild(ul);
+  document.getElementById("warnings-banner").appendChild(box);
+}
+
+// ---------------------------------------------------------------- tabs
+const tabButtons = [
+  ["tab-btn-overview", "tab-overview"],
+  ["tab-btn-byplot", "tab-byplot"],
+  ["tab-btn-bygroup", "tab-bygroup"],
+];
+tabButtons.forEach(([btnId, panelId]) => {
+  document.getElementById(btnId).addEventListener("click", () => {
+    tabButtons.forEach(([b, p]) => {
+      document.getElementById(b).setAttribute("aria-selected", b === btnId ? "true" : "false");
+      document.getElementById(p).hidden = (p !== panelId);
+    });
+  });
+});
+
+// ---------------------------------------------------------------- tab1: overview
+function renderSummary() {
+  const s = DATA.summary;
+  const tiles = [
+    ["全体残時間", fmtH(s.total_remaining_h)],
+    ["全体の総作業時間", fmtH(s.total_full_h)],
+    ["全体進捗", fmtPct(s.progress_pct)],
+  ];
+  const row = document.getElementById("overview-summary");
+  row.innerHTML = "";
+  tiles.forEach(([label, value]) => {
+    const tile = document.createElement("div");
+    tile.className = "stat-tile";
+    tile.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    row.appendChild(tile);
+  });
+}
+
+let overviewSortMode = "order"; // "order" | "remaining"
+const overviewCharts = [];
+
+function renderOverviewTable(items) {
+  let html = '<table class="data-table"><thead><tr><th>plot</th><th class="num">残時間(h)</th><th class="num">総時間(h)</th><th class="num">進捗</th></tr></thead><tbody>';
+  items.forEach(it => {
+    html += `<tr><td>${it.plot}</td><td class="num">${it.remaining_h.toFixed(1)}</td><td class="num">${it.total_h.toFixed(1)}</td><td class="num">${it.progress_pct.toFixed(1)}%</td></tr>`;
+  });
+  html += "</tbody></table>";
+  document.getElementById("overview-table").innerHTML = html;
+}
+
+function renderRingGrid() {
+  overviewCharts.forEach(c => c.destroy());
+  overviewCharts.length = 0;
+
+  let items = DATA.overview.slice();
+  if (overviewSortMode === "remaining") {
+    items.sort((a, b) => b.remaining_h - a.remaining_h);
+  }
+
+  const grid = document.getElementById("ring-grid");
+  grid.innerHTML = "";
+
+  items.forEach(item => {
+    const r = ringRadius(item.remaining_h);
+    const size = Math.round(r * 2);
+
+    const card = document.createElement("div");
+    card.className = "ring-card";
+
+    const wrap = document.createElement("div");
+    wrap.className = "ring-canvas-wrap";
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    canvas.style.width = size + "px";
+    canvas.style.height = size + "px";
+    wrap.appendChild(canvas);
+    card.appendChild(wrap);
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "plot-name";
+    nameEl.textContent = item.plot;
+    card.appendChild(nameEl);
+
+    const figEl = document.createElement("div");
+    figEl.className = "plot-figures";
+    figEl.textContent = `残り ${fmtH(item.remaining_h)} ・ 進捗 ${fmtPct(item.progress_pct)}`;
+    card.appendChild(figEl);
+
+    grid.appendChild(card);
+
+    const chart = new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels: ["進捗済み", "残り"],
+        datasets: [{
+          data: [item.progress_pct, 100 - item.progress_pct],
+          backgroundColor: [getCss("--accent"), getCss("--track")],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: false,
+        cutout: "68%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                if (ctx.dataIndex === 0) return `進捗 ${fmtPct(item.progress_pct)}`;
+                return `残り ${fmtH(item.remaining_h)} / 総 ${fmtH(item.total_h)}`;
+              },
+            },
+          },
+        },
+      },
+    });
+    overviewCharts.push(chart);
+  });
+
+  renderOverviewTable(items);
+}
+
+document.getElementById("sort-order-btn").addEventListener("click", () => {
+  overviewSortMode = "order";
+  document.getElementById("sort-order-btn").setAttribute("aria-pressed", "true");
+  document.getElementById("sort-remaining-btn").setAttribute("aria-pressed", "false");
+  renderRingGrid();
+});
+document.getElementById("sort-remaining-btn").addEventListener("click", () => {
+  overviewSortMode = "remaining";
+  document.getElementById("sort-order-btn").setAttribute("aria-pressed", "false");
+  document.getElementById("sort-remaining-btn").setAttribute("aria-pressed", "true");
+  renderRingGrid();
+});
+
+renderSummary();
+renderRingGrid();
+
+// ---------------------------------------------------------------- tab2: by plot
+let byPlotChart = null;
+
+function renderByPlotTable(rows) {
+  let html = '<table class="data-table"><thead><tr><th>category</th><th class="num">残時間(h)</th><th class="num">総時間(h)</th><th class="num">進捗</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    html += `<tr><td>${r.group}</td><td class="num">${r.remaining_h.toFixed(1)}</td><td class="num">${r.total_h.toFixed(1)}</td><td class="num">${r.progress_pct.toFixed(1)}%</td></tr>`;
+  });
+  html += "</tbody></table>";
+  document.getElementById("byplot-table").innerHTML = html;
+}
+
+function renderByPlotLegend() {
+  const legend = document.getElementById("byplot-legend");
+  legend.innerHTML = DATA.groups.map(g =>
+    `<span><span class="swatch" style="background:${GROUP_COLORS[g]}"></span>${g}</span>`
+  ).join("");
+}
+
+function renderByPlot(plot) {
+  const rows = DATA.by_plot[plot];
+  const rawValues = rows.map(r => r.remaining_h);
+  const displayAngles = clippedSliceAngles(rawValues);
+
+  if (byPlotChart) byPlotChart.destroy();
+  const ctx = document.getElementById("byplot-canvas");
+  byPlotChart = new Chart(ctx, {
+    type: "pie",
+    data: {
+      labels: DATA.groups,
+      datasets: [{
+        data: displayAngles,
+        backgroundColor: DATA.groups.map(g => GROUP_COLORS[g]),
+        borderColor: getCss("--surface-1"),
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const r = rows[c.dataIndex];
+              return `${r.group}: ${fmtH(r.remaining_h)}（総 ${fmtH(r.total_h)}）`;
+            },
+          },
+        },
+      },
+    },
+  });
+
+  renderByPlotTable(rows);
+}
+
+const byPlotSelect = document.getElementById("byplot-select");
+DATA.plots.forEach(p => {
+  const opt = document.createElement("option");
+  opt.value = p;
+  opt.textContent = p;
+  byPlotSelect.appendChild(opt);
+});
+byPlotSelect.addEventListener("change", () => renderByPlot(byPlotSelect.value));
+renderByPlotLegend();
+if (DATA.plots.length > 0) renderByPlot(DATA.plots[0]);
+
+// ---------------------------------------------------------------- tab3: by group
+// plot数が多い場合は小さい順に「その他」へ畳む（8以上で発動）
+const BYGROUP_MAX_SLICES = 8;
+let byGroupChart = null;
+let currentGroup = DATA.groups[0];
+
+function foldOther(rows) {
+  // rows: [{plot, remaining_h, share_pct}], 既に出現順
+  if (rows.length <= BYGROUP_MAX_SLICES) return rows;
+  const sorted = rows.slice().sort((a, b) => b.remaining_h - a.remaining_h);
+  const kept = sorted.slice(0, BYGROUP_MAX_SLICES - 1);
+  const rest = sorted.slice(BYGROUP_MAX_SLICES - 1);
+  const otherH = rest.reduce((s, r) => s + r.remaining_h, 0);
+  const otherPct = rest.reduce((s, r) => s + r.share_pct, 0);
+  kept.push({ plot: `その他（${rest.length}件）`, remaining_h: Math.round(otherH * 10) / 10, share_pct: Math.round(otherPct * 10) / 10 });
+  return kept;
+}
+
+function renderByGroupTable(rows) {
+  let html = '<table class="data-table"><thead><tr><th>plot</th><th class="num">残時間(h)</th><th class="num">割合</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    html += `<tr><td>${r.plot}</td><td class="num">${r.remaining_h.toFixed(1)}</td><td class="num">${r.share_pct.toFixed(1)}%</td></tr>`;
+  });
+  html += "</tbody></table>";
+  document.getElementById("bygroup-table").innerHTML = html;
+}
+
+function renderByGroup(group) {
+  currentGroup = group;
+  const rawRows = DATA.by_group[group];
+  const rows = foldOther(rawRows);
+  const rawValues = rows.map(r => r.remaining_h);
+  const displayAngles = clippedSliceAngles(rawValues);
+  const colors = rows.map((_, i) => plotColor(i));
+
+  if (byGroupChart) byGroupChart.destroy();
+  const ctx = document.getElementById("bygroup-canvas");
+  byGroupChart = new Chart(ctx, {
+    type: "pie",
+    data: {
+      labels: rows.map(r => r.plot),
+      datasets: [{
+        data: displayAngles,
+        backgroundColor: colors,
+        borderColor: getCss("--surface-1"),
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const r = rows[c.dataIndex];
+              return `${r.plot}: ${fmtH(r.remaining_h)}（${fmtPct(r.share_pct)}）`;
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const legend = document.getElementById("bygroup-legend");
+  legend.innerHTML = rows.map((r, i) =>
+    `<span><span class="swatch" style="background:${colors[i]}"></span>${r.plot}</span>`
+  ).join("");
+
+  renderByGroupTable(rows);
+}
+
+const subtabs = document.getElementById("bygroup-subtabs");
+DATA.groups.forEach(g => {
+  const btn = document.createElement("button");
+  btn.textContent = g;
+  btn.setAttribute("aria-selected", g === currentGroup ? "true" : "false");
+  btn.addEventListener("click", () => {
+    [...subtabs.children].forEach(b => b.setAttribute("aria-selected", "false"));
+    btn.setAttribute("aria-selected", "true");
+    renderByGroup(g);
+  });
+  subtabs.appendChild(btn);
+});
+renderByGroup(currentGroup);
+</script>
+</body>
+</html>

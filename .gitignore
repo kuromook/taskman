@@ -2,3 +2,4 @@
 /gas-projects/
 __pycache__/
 *.pyc
+/dashboard.html

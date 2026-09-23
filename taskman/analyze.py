@@ -60,21 +60,13 @@ def summarize(acc: dict[str, int]) -> dict[str, int]:
     return {group: sum(acc.get(cat, 0) for cat in cats) for group, cats in GROUP_MAP.items()}
 
 
-def analyze(
-    rows: list[Row], categories: list[str], weights: Weights
+def _accumulate(
+    rows: list[Row], categories: list[str], weights: Weights, *, only_blank: bool
 ) -> tuple[Result, list[str]]:
-    """plot ごとの残作業時間（分・5群）を集計する。
+    """analyze() と total_time() の共通実装。
 
-    Args:
-        rows: シートの全行（メタ列＋カテゴリ列の dict）
-        categories: 集計対象カテゴリ（シートヘッダ ∩ マスタの全カテゴリ、
-            呼び出し側で算出済みのもの）
-        weights: {mode: {category: minutes}}
-
-    Returns:
-        (result, warnings)
-        result: {plot: {group: minutes}}（分単位、5群）
-        warnings: 処理中に検出した警告メッセージのリスト
+    only_blank=True  : 空白セルのみ加算（＝残作業時間。既存 analyze() の挙動）
+    only_blank=False : 着手状態を問わず全対象セルを加算（＝満額の作業時間）
     """
     result: Result = {}
     skipped: dict[tuple[str, object], int] = {}  # (plot, mode) -> スキップ行数
@@ -91,7 +83,9 @@ def analyze(
                 skipped[key] = skipped.get(key, 0) + 1
                 continue
             for cat in categories:
-                if cat in mode_weights and row.get(cat) in (None, ""):
+                if cat not in mode_weights:
+                    continue
+                if not only_blank or row.get(cat) in (None, ""):
                     acc[cat] += mode_weights[cat]
 
         result[plot] = summarize(acc)
@@ -102,3 +96,33 @@ def analyze(
     ]
 
     return result, warnings
+
+
+def analyze(
+    rows: list[Row], categories: list[str], weights: Weights
+) -> tuple[Result, list[str]]:
+    """plot ごとの残作業時間（分・5群）を集計する。
+
+    Args:
+        rows: シートの全行（メタ列＋カテゴリ列の dict）
+        categories: 集計対象カテゴリ（シートヘッダ ∩ マスタの全カテゴリ、
+            呼び出し側で算出済みのもの）
+        weights: {mode: {category: minutes}}
+
+    Returns:
+        (result, warnings)
+        result: {plot: {group: minutes}}（分単位、5群）
+        warnings: 処理中に検出した警告メッセージのリスト
+    """
+    return _accumulate(rows, categories, weights, only_blank=True)
+
+
+def total_time(rows: list[Row], categories: list[str], weights: Weights) -> Result:
+    """plot ごとの「満額」の作業時間（分・5群）。
+
+    着手状態を問わず全対象セルを加算する。remaining（analyze()の結果）との
+    差分から進捗率を出すために使う。warnings は analyze() 側で報告済みの
+    ため、ここでは返さない（同じ内容を二重報告しない）。
+    """
+    result, _ = _accumulate(rows, categories, weights, only_blank=False)
+    return result

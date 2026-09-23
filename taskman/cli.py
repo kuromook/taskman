@@ -9,11 +9,14 @@ import argparse
 import sys
 
 from .analyze import GROUP_ORDER, analyze
+from .dashboard import render as render_dashboard
 from .master import load_master, master_categories
 from .sheet import load_sheet
+from .view_data import build_dashboard_data
 
 DEFAULT_MASTER = "restoration/modemap.csv"
 DEFAULT_SHEET = "lineart"
+DEFAULT_DASHBOARD_OUTPUT = "dashboard.html"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,6 +34,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--master", default=DEFAULT_MASTER, help=f"重みマスタCSV（既定: {DEFAULT_MASTER}）"
     )
     p_analyze.set_defaults(func=cmd_analyze)
+
+    p_dashboard = sub.add_parser(
+        "dashboard", help="静的HTMLダッシュボードを生成する"
+    )
+    p_dashboard.add_argument("input", help="入力xlsx（原稿ブック形式）")
+    p_dashboard.add_argument(
+        "--sheet", default=DEFAULT_SHEET, help=f"対象シート名（既定: {DEFAULT_SHEET}）"
+    )
+    p_dashboard.add_argument(
+        "--master", default=DEFAULT_MASTER, help=f"重みマスタCSV（既定: {DEFAULT_MASTER}）"
+    )
+    p_dashboard.add_argument(
+        "-o",
+        "--output",
+        default=DEFAULT_DASHBOARD_OUTPUT,
+        help=f"出力HTMLファイルパス（既定: {DEFAULT_DASHBOARD_OUTPUT}）",
+    )
+    p_dashboard.set_defaults(func=cmd_dashboard)
 
     return parser
 
@@ -84,6 +105,30 @@ def _print_table(result: dict[str, dict[str, int]]) -> None:
     total = sum(h for _, _, h in lines)
     print("-" * len(header))
     print(f"{'total':<{plot_w + 2 + group_w}}  {total:>6.1f}")
+
+
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    try:
+        weights = load_master(args.master)
+        rows, sheet_categories = load_sheet(args.input, sheet_name=args.sheet)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+
+    categories = [c for c in sheet_categories if c in master_categories(weights)]
+    data = build_dashboard_data(rows, categories, weights, input_file=args.input)
+    html = render_dashboard(data)
+
+    with open(args.output, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    print(f"generated: {args.output}")
+    if data["warnings"]:
+        print(file=sys.stderr)
+        for w in data["warnings"]:
+            print(f"warning: {w}", file=sys.stderr)
+
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

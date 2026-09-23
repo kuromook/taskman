@@ -164,3 +164,27 @@ task_tracking/
 - [ ] concept ブック（`spreadsheets/concept.xlsx`）側の lineart 読込は
       データ開始行が異なる（原稿=3行目、concept=4行目）ため未対応。
       設計書§7-7の `--data-start-row` オプション案を検討するか判断待ち。
+
+### WebUIダッシュボード実装完了（2026-09-23、Claude）
+
+- `webui設計書.md`（円グラフ・サイズ可変ドーナツ方式）どおり実装。
+  `python -m taskman dashboard <input.xlsx> [-o dashboard.html]` で
+  サーバー不要の単一HTMLファイルを生成する
+  （新規Python依存なし。Chart.jsはCDN参照）。
+- 実装ファイル: `taskman/view_data.py`（画面用データ変換）、
+  `taskman/dashboard.py`（HTML生成）、
+  `taskman/templates/dashboard.html.tmpl`、`analyze.py`に`total_time()`
+  追加、`cli.py`に`dashboard`サブコマンド追加。
+- タブ1（全体俯瞰）: plotごとのサイズ可変ドーナツ（外径=残時間の
+  sqrtスケール、塗り=進捗％）。タブ2（plot別）・タブ3（カテゴリ別）は
+  通常の円グラフ＋数値表。色は dataviz skill検証済みパレット
+  （円の輪の継ぎ目を含む隣接ペアも検証済み）。
+- ブラウザ実機確認済み（claude-in-chrome、3タブとも正常表示）。
+- 設計からの変更点: HTML生成をstring.Template→素朴なstr.replace()に変更
+  （JSのテンプレートリテラルとの`$`衝突を避けるため。依存追加なしは
+  変わらず）。詳細は`webui設計書.md`末尾「実装メモ」参照。
+- `dashboard.html`（生成物）は`.gitignore`に追加済み（ビルド出力のため
+  コミット対象外）。
+- 未着手: concept側ブック対応、タブ3の8件超フォールバックは実装済みだが
+  実データでは未発動（現状7 plot）。サイズ・角度のクリップ定数は仮値の
+  まま（見た目に違和感なかったため今回調整なし）。
