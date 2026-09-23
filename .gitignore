@@ -1,0 +1,4 @@
+/spreadsheets/
+/gas-projects/
+__pycache__/
+*.pyc
